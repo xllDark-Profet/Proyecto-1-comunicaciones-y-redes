@@ -13,6 +13,7 @@ import java.util.Map;
 
 
 public class Server {
+
     ServerSocket server;
     Socket socket;
     final private int PUERTO = 8080;
@@ -23,7 +24,9 @@ public class Server {
 
     }
 
-    public void iniciar() throws IOException {
+    public void iniciar(String dir) throws IOException {
+
+        String path = dir;
         System.out.println("Iniciando servidor Proxy ");
         //crea servidor
         server = new ServerSocket(this.PUERTO);
@@ -42,7 +45,7 @@ public class Server {
 
 
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(new URI("http://info.cern.ch/"))
+                        .uri(new URI(path))
                         //.header("Host", "info.cern.ch") - : restricted header name: "Connection"
                         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0")
                         .header("Accept"," text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,/;q=0.8")
@@ -75,7 +78,9 @@ public class Server {
         return resultado.toString();
     }
 
-    public void direccionar() throws IOException{
+    public void direccionar(String dir) throws IOException{
+
+        String path = dir;
 
         //crea servidor
         server = new ServerSocket(this.PUERTO);
@@ -88,7 +93,7 @@ public class Server {
 
                 output = new DataOutputStream(socket.getOutputStream());
 
-                URL url = new URL("http://info.cern.ch/");
+                URL url = new URL(path);
                 HttpURLConnection con = (HttpURLConnection) url.openConnection();
                 con.setRequestMethod("GET");
                 con.setRequestProperty("Upgrade-Insecure-Requests", "1");
