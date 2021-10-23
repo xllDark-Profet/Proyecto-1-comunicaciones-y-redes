@@ -24,64 +24,44 @@ public class Server {
     }
 
     public void iniciar() throws IOException {
-     //   System.out.println("Iniciando servidor Proxy ");
+        System.out.println("Iniciando servidor Proxy ");
         //crea servidor
         server = new ServerSocket(this.PUERTO);
         try{
             while (true) {
 
                 //crea socket del cliente
-                socket = new Socket("192.168.0.3",8080);
-
-
-
+                socket = new Socket();
                 //el servidor espera solicitud
                 socket = server.accept();
 
-            //    System.out.println(server.getLocalPort() + " : " + server.getInetAddress().toString());
-
                 InputStream input = socket.getInputStream();
 
+                HttpClient client = HttpClient.newHttpClient();
+                String headerRequest = leerSolicitud(input);
+
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(new URI("http://info.cern.ch/"))
+                        //.header("Host", "info.cern.ch") - : restricted header name: "Connection"
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0")
+                        .header("Accept"," text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,/;q=0.8")
+                        .header("Accept-Language", "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3")
+                        .header("Accept-Encoding", "gzip, deflate")
+                        //.header("Connection", "keep-alive") - : restricted header name: "Connection"
+                        .header("Upgrade-Insecure-Requests", "1")
+                        .GET()
+                        .build();
+
+                System.out.println(request.headers().toString());
+
+
                 output = new DataOutputStream(socket.getOutputStream());
-
-      //        HttpClient client = HttpClient.newHttpClient();
-
-      //        String headerRequest = leerSolicitud(input);
-
-
-
-
-                URL url = new URL("http://info.cern.ch/");
-                HttpURLConnection con = (HttpURLConnection) url.openConnection();
-                con.setRequestMethod("GET");
-                con.setRequestProperty("Upgrade-Insecure-Requests", "1");
-                con.connect();
-                    BufferedReader in = new BufferedReader(
-                        new InputStreamReader(url.openStream()));
-
-                String inputLine, body = "";
-                while ((inputLine = in.readLine()) != null)
-                    body = body + inputLine;
-                in.close();
-
-
-
-
-
-
-
-                // Send response
-                output.write("HTTP/1.0 200 OK\r\n".getBytes());
-                output.write("Date: Sat, 23 Oct 2021 20:33:58 GMT\r\n".getBytes());
-                output.write("Content-type: text/html\r\n".getBytes());
-                output.write("\r\n".getBytes()); // End of headers
-                output.write(body.getBytes());
-
-
+                output.writeUTF("adios");
                 socket.close();
             }
 
-        } catch (IOException e) {
+        } catch (IOException | URISyntaxException e) {
             e.printStackTrace();
         }
     }
@@ -91,8 +71,51 @@ public class Server {
         do {
             resultado.append((char) inputStream.read());
         } while (inputStream.available() > 0);
-   //   System.out.println(resultado.toString());
+        System.out.println(resultado.toString());
         return resultado.toString();
     }
+
+    public void direccionar() throws IOException{
+
+        //crea servidor
+        server = new ServerSocket(this.PUERTO);
+
+        try{
+            while (true) {
+                socket = new Socket("192.168.20.23",8080);
+                socket = server.accept();
+                InputStream input = socket.getInputStream();
+
+                output = new DataOutputStream(socket.getOutputStream());
+
+                URL url = new URL("http://info.cern.ch/");
+                HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                con.setRequestMethod("GET");
+                con.setRequestProperty("Upgrade-Insecure-Requests", "1");
+                con.connect();
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(url.openStream()));
+
+                String inputLine, body = "";
+                while ((inputLine = in.readLine()) != null)
+                    body = body + inputLine;
+                in.close();
+
+                // Send response
+                output.write("HTTP/1.0 200 OK\r\n".getBytes());
+                output.write("Date: Sat, 23 Oct 2021 20:33:58 GMT\r\n".getBytes());
+                output.write("Content-type: text/html\r\n".getBytes());
+                output.write("\r\n".getBytes()); // End of headers
+                output.write(body.getBytes());
+
+                socket.close();
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
 }
 
