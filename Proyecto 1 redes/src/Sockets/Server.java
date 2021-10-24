@@ -8,9 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 public class Server {
@@ -18,19 +16,23 @@ public class Server {
     ServerSocket server;
     Socket socket;
     final private int PUERTO = 8080;
-    DataOutputStream output;
+    OutputStream output;
     InputStream input;
 
     public void Server(){
 
     }
 
-    public void iniciar(String dir) throws IOException {
+    public void iniciar() throws IOException {
 
-        String path = dir;
+
         System.out.println("Iniciando servidor Proxy ");
         //crea servidor
         server = new ServerSocket(this.PUERTO);
+
+
+        System.out.println("Inet address: "+socket.getInetAddress());
+        System.out.println("Port number: "+socket.getLocalPort());
         try{
             while (true) {
 
@@ -41,78 +43,7 @@ public class Server {
 
                 InputStream input = socket.getInputStream();
 
-                HttpClient client = HttpClient.newHttpClient();
                 String headerRequest = leerSolicitud(input);
-
-
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(new URI(path))
-                        //.header("Host", "info.cern.ch") - : restricted header name: "Connection"
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:93.0) Gecko/20100101 Firefox/93.0")
-                        .header("Accept"," text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,/;q=0.8")
-                        .header("Accept-Language", "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3")
-                        .header("Accept-Encoding", "gzip, deflate")
-                        //.header("Connection", "keep-alive") - : restricted header name: "Connection"
-                        .header("Upgrade-Insecure-Requests", "1")
-                        .GET()
-                        .build();
-
-                System.out.println(request.headers().toString());
-
-
-                output = new DataOutputStream(socket.getOutputStream());
-                output.writeUTF("adios");
-                socket.close();
-            }
-
-        } catch (IOException | URISyntaxException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public String leerSolicitud(InputStream inputStream) throws IOException {
-        StringBuilder resultado = new StringBuilder();
-        do {
-            resultado.append((char) inputStream.read());
-        } while (inputStream.available() > 0);
-        System.out.println(resultado.toString());
-        return resultado.toString();
-    }
-
-    public void direccionar(String dir) throws IOException{
-
-        String path = dir;
-
-        //crea servidor
-        server = new ServerSocket(this.PUERTO);
-
-        try{
-            while (true) {
-                socket = new Socket("192.168.20.23",8080);
-                socket = server.accept();
-                InputStream input = socket.getInputStream();
-
-                output = new DataOutputStream(socket.getOutputStream());
-
-                URL url = new URL(path);
-                HttpURLConnection con = (HttpURLConnection) url.openConnection();
-                con.setRequestMethod("GET");
-                con.setRequestProperty("Upgrade-Insecure-Requests", "1");
-                con.connect();
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(url.openStream()));
-
-                String inputLine, body = "";
-                while ((inputLine = in.readLine()) != null)
-                    body = body + inputLine;
-                in.close();
-
-                // Send response
-                output.write("HTTP/1.0 200 OK\r\n".getBytes());
-                output.write("Date: Sat, 23 Oct 2021 20:33:58 GMT\r\n".getBytes());
-                output.write("Content-type: text/html\r\n".getBytes());
-                output.write("\r\n".getBytes()); // End of headers
-                output.write(body.getBytes());
 
                 socket.close();
             }
@@ -120,16 +51,95 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void direccionar() throws IOException{
+
+        server = new ServerSocket(this.PUERTO); //crea servidor
+        socket = new Socket("192.168.0.3", this.PUERTO); //crea cliente
+
+            while (true) {
+
+                try {
+
+                    socket = server.accept(); //servidor se conecta con el cliente
+
+                    input = socket.getInputStream();
+
+                    output = socket.getOutputStream();
+
+                    if (input.available() > 0 && socket.isConnected()) {
+
+                        String request = leerSolicitud(input);
+
+                        if (request.contains("POST") | request.contains("GET")) {
+
+                            String direccionUrl = request.split("\n")[0].split(" ", 3)[1].strip(); //obtiene direccion url
+
+                            //System.out.println("direccion:" + direccionUrl);
+
+                            URL url = new URL(direccionUrl);
+
+                            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+
+                            mapearHeadersSolicitud(request, con); //mapea headers para ejecutar la solicitud
+
+                            con.connect(); // ejecuta solicitud
+
+                            String body = leerBody(url);
+
+                            String response = "HTTP/1.1 " + con.getResponseCode() + " " + con.getResponseMessage() + "\r\n";
+                            response = response + mapearRespuesta(con) + "\r\n" + body; //costruye respuesta
+
+
+
+                            System.out.println( "\n" + response + "\n");
+
+
+                            if (!socket.isClosed()) {
+                                output.write(response.getBytes());  // enviar respuesta
+                                output.flush();
+                            }
+
+                            con.disconnect();
+                            socket.close();
+                        }
+                    }
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
     }
 
+    public void mapearHeadersSolicitud(String request, HttpURLConnection con) throws ProtocolException {
+
+        List<String> lineas = Arrays.asList(request.split("\n"));
+
+        boolean primeraLinea = true;
+
+        for (String linea : lineas){
+
+            if(!linea.contains("HTTP") && linea.contains(":"))
+            {
+                String[] header = linea.split(":",2);
+                System.out.println(header[0] + header[1]);
+                con.addRequestProperty(header[0].strip(),header[1].strip());
+            }
+            else if (primeraLinea)
+            {
+                String[] primeralinea = linea.split(" ", 3);
+                con.setRequestMethod(primeralinea[0].strip());
+                primeraLinea = false;
+            }
+        }
+    }
+
+
+
     public String mapearRespuesta(HttpURLConnection httpURLConnection) throws IOException {
         StringBuilder builder = new StringBuilder();
-
-        builder.append(httpURLConnection.getResponseCode())
-                .append(" ")
-                .append(httpURLConnection.getResponseMessage())
-                .append("\n");
 
         Map<String, List<String>> map = httpURLConnection.getHeaderFields();
 
@@ -155,6 +165,27 @@ public class Server {
             builder.append("\n");
         }
         return builder.toString();
+    }
+
+    public String leerBody(URL url) throws IOException {
+        BufferedReader in = new BufferedReader(
+                new InputStreamReader(url.openStream()));
+
+        String inputLine, body = "";
+        while ((inputLine = in.readLine()) != null)
+            body = body + inputLine;
+        in.close();
+
+        return body;
+    }
+
+    public String leerSolicitud(InputStream inputStream) throws IOException {
+        StringBuilder resultado = new StringBuilder();
+        do {
+            resultado.append((char) inputStream.read());
+        } while (inputStream.available() > 0);
+        System.out.println(resultado.toString());
+        return resultado.toString();
     }
 
 }
