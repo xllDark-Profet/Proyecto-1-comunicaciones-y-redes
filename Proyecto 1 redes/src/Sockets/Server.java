@@ -20,6 +20,7 @@ public class Server {
     final private int PUERTO = 8080;
     OutputStream output;
     InputStream input;
+    File archivo = new File ("operaciones.txt");
 
     public void Server(){
 
@@ -46,11 +47,10 @@ public class Server {
 
                     String request = leerSolicitud(input);
 
+
                     if (request.contains("POST") | request.contains("GET")) {
 
                         String direccionUrl = request.split("\n")[0].split(" ", 3)[1].strip(); //obtiene direccion url
-
-                        //System.out.println("direccion:" + direccionUrl);
 
                         String host = " ";
 
@@ -85,8 +85,6 @@ public class Server {
 
                         if(status < 400) {
 
-                            //System.out.println(status);
-
                             if(con.getRequestMethod().equals("POST")) {
 
                                 String line;
@@ -111,6 +109,7 @@ public class Server {
                         response = response + mapearRespuesta(con) + "\r\n" + body; //costruye respuesta
 
                         System.out.println( "\n" + response + "\n");
+                        escribirtxt(response);
 
 
                         if (!socket.isClosed()) {
@@ -149,8 +148,6 @@ public class Server {
             {
                 String[] header = linea.split(":",2);
 
-                //System.out.println(header[0] + header[1]);
-
                 if(header[0].strip() == "Host" && host != " ")
                     con.addRequestProperty(header[0].strip(),host);
                 else
@@ -168,7 +165,6 @@ public class Server {
                     post = true;
             }
             else if(post && linea.equals(lineas.get(lineas.size()-1))) {
-                //System.out.println("linea-" + linea);
                 return linea;
             }
         }
@@ -234,6 +230,7 @@ public class Server {
 
         System.out.println(resultado.toString());
 
+        escribirtxt(resultado.toString());
         return resultado.toString();
     }
 
@@ -278,4 +275,29 @@ public class Server {
 
         return respuesta;
     }
+
+
+    public void escribirtxt ( String operacion){
+        FileWriter escribir = null;
+
+        try {
+            escribir = new FileWriter("operaciones.txt", true);
+            BufferedWriter escritor = new BufferedWriter(escribir);
+            escritor.write(operacion);
+            escritor.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        finally {
+            if (escribir != null) {
+                try {
+                    escribir.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
 }
