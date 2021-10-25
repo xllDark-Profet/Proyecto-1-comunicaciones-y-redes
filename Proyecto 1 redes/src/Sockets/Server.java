@@ -8,6 +8,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 
@@ -23,127 +25,132 @@ public class Server {
 
     }
 
-    public void iniciar() throws IOException {
-
-
-        System.out.println("Iniciando servidor Proxy ");
-        //crea servidor
-        server = new ServerSocket(this.PUERTO);
-
-
-        System.out.println("Inet address: "+socket.getInetAddress());
-        System.out.println("Port number: "+socket.getLocalPort());
-        try{
-            while (true) {
-
-                //crea socket del cliente
-                socket = new Socket();
-                //el servidor espera solicitud
-                socket = server.accept();
-
-                InputStream input = socket.getInputStream();
-
-                String headerRequest = leerSolicitud(input);
-
-                socket.close();
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     public void direccionar() throws IOException{
 
+        InetAddress miIP =InetAddress.getLocalHost();
+
         server = new ServerSocket(this.PUERTO); //crea servidor
-        socket = new Socket("192.168.0.3", this.PUERTO); //crea cliente
+        socket = new Socket(miIP, this.PUERTO); //crea cliente
 
-            while (true) {
+        while (true) {
 
-                try {
+            try {
 
-                    socket = server.accept(); //servidor se conecta con el cliente
+                socket = server.accept(); //servidor se conecta con el cliente
 
-                    input = socket.getInputStream();
+                input = socket.getInputStream();
 
-                    output = socket.getOutputStream();
+                output = socket.getOutputStream();
 
-                    if (input.available() > 0 && socket.isConnected()) {
+                if (input.available() > 0 && socket.isConnected()) {
 
-                        String request = leerSolicitud(input);
+                    String request = leerSolicitud(input);
 
-                        if (request.contains("POST") | request.contains("GET")) {
+                    if (request.contains("POST") | request.contains("GET")) {
 
-                            String direccionUrl = request.split("\n")[0].split(" ", 3)[1].strip(); //obtiene direccion url
+                        String direccionUrl = request.split("\n")[0].split(" ", 3)[1].strip(); //obtiene direccion url
 
-                            System.out.println("direccion:" + direccionUrl);
+                        System.out.println("direccion:" + direccionUrl);
 
-                            String host = " ";
+                        String host = " ";
 
-                            List<String> sitioVirtual = verificarSitioVirtual(direccionUrl);
-                            if(!sitioVirtual.isEmpty())
-                                if(!direccionUrl.equals(sitioVirtual.get(0))) {
-                                    direccionUrl = sitioVirtual.get(0);
-                                    host = sitioVirtual.get(1);
-                                }
+                        List<String> sitioVirtual = verificarSitioVirtual(direccionUrl);
 
-                            URL url = new URL(direccionUrl);
+                        if(!sitioVirtual.isEmpty())
+                            if(!direccionUrl.equals(sitioVirtual.get(0))) {
 
-                            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+                                direccionUrl = sitioVirtual.get(0);
+                                host = sitioVirtual.get(1);
 
-                            mapearHeadersSolicitud(request, con, host); //mapea headers para ejecutar la solicitud
-
-                            con.connect(); // ejecuta solicitud
-
-                            String body ="";
-
-                            int status = con.getResponseCode();
-
-                            if(status < 400)
-                                body = leerBody(url);
-                            else
-                                input = con.getErrorStream();
-
-                            String response = "HTTP/1.1 " + con.getResponseCode() + " " + con.getResponseMessage() + "\r\n";
-                            response = response + mapearRespuesta(con) + "\r\n" + body; //costruye respuesta
-
-                            System.out.println( "\n" + response + "\n");
-
-
-                            if (!socket.isClosed()) {
-                                output.write(response.getBytes());  // enviar respuesta
-                                output.flush();
                             }
 
-                            con.disconnect();
-                        }
-                        else if (request.contains("CONNECT"))
-                        {
-                            output.write(("HTTP/1.1 200 Connection Established").getBytes());
-                            output.flush();
-                      }
-                        socket.close();
-                    }
+                        URL url = new URL(direccionUrl);
 
-                } catch (IOException e) {
-                    e.printStackTrace();
+                        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+
+                        String cuerpoPost = mapearHeadersSolicitud(request, con, host); //mapea headers para ejecutar la solicitud
+
+                        if(!cuerpoPost.equals(" "))
+                        {
+                            con.setDoOutput(true);
+                            OutputStream os = con.getOutputStream();
+                            os.write(cuerpoPost.getBytes());
+                        }
+
+                        con.connect(); // ejecuta solicitud
+
+                        String body ="";
+
+                        int status = con.getResponseCode();
+
+                        if(status < 400) {
+
+                            System.out.println(status);
+
+                            if(con.getRequestMethod().equals("POST")) {
+
+                                String line;
+                                StringBuffer responeContent = new StringBuffer();
+                                BufferedReader reader = new BufferedReader(new InputStreamReader(con.getInputStream()));
+
+                                while ((line = reader.readLine()) != null) {
+                                    responeContent.append(line);
+                                }
+
+                                body = responeContent.toString();
+                                reader.close();
+                            }
+                               else
+                                   body = leerBody(url);
+
+                        }
+                        else
+                            input = con.getErrorStream();
+
+                        String response = "HTTP/1.1 " + con.getResponseCode() + " " + con.getResponseMessage() + "\r\n";
+                        response = response + mapearRespuesta(con) + "\r\n" + body; //costruye respuesta
+
+                        System.out.println( "\n" + response + "\n");
+
+
+                        if (!socket.isClosed()) {
+                            output.write(response.getBytes());  // enviar respuesta
+                            output.flush();
+                        }
+
+                        con.disconnect();
+                    }
+                    else if (request.contains("CONNECT"))
+                    {
+                        output.write(("HTTP/1.1 200 Connection Established").getBytes());
+                        output.flush();
+                    }
+                    socket.close();
                 }
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+        }
 
     }
 
-    public void mapearHeadersSolicitud(String request, HttpURLConnection con, String host) throws ProtocolException {
+    public String mapearHeadersSolicitud(String request, HttpURLConnection con, String host) throws ProtocolException {
 
         List<String> lineas = Arrays.asList(request.split("\n"));
 
         boolean primeraLinea = true;
+
+        boolean post = false;
 
         for (String linea : lineas){
 
             if(!linea.contains("HTTP") && linea.contains(":"))
             {
                 String[] header = linea.split(":",2);
+
                 System.out.println(header[0] + header[1]);
+
                 if(header[0].strip() == "Host" && host != " ")
                     con.addRequestProperty(header[0].strip(),host);
                 else
@@ -152,10 +159,20 @@ public class Server {
             else if (primeraLinea)
             {
                 String[] primeralinea = linea.split(" ", 3);
+
                 con.setRequestMethod(primeralinea[0].strip());
+
                 primeraLinea = false;
+
+                if(primeralinea[0].strip().equals("POST"))
+                    post = true;
+            }
+            else if(post && linea.equals(lineas.get(lineas.size()-1))) {
+                //System.out.println("linea-" + linea);
+                return linea;
             }
         }
+        return " ";
     }
 
 
@@ -175,6 +192,7 @@ public class Server {
             List<String> headerValues = entry.getValue();
 
             Iterator<String> it = headerValues.iterator();
+
             if (it.hasNext()) {
                 builder.append(it.next());
 
@@ -190,30 +208,45 @@ public class Server {
     }
 
     public String leerBody(URL url) throws IOException {
+
         BufferedReader in = new BufferedReader(
                 new InputStreamReader(url.openStream()));
 
         String inputLine, body = "";
+
         while ((inputLine = in.readLine()) != null)
             body = body + inputLine;
+
         in.close();
 
         return body;
     }
 
     public String leerSolicitud(InputStream inputStream) throws IOException {
+
         StringBuilder resultado = new StringBuilder();
+
         do {
+
             resultado.append((char) inputStream.read());
+
         } while (inputStream.available() > 0);
+
         System.out.println(resultado.toString());
+
         return resultado.toString();
     }
 
     public List<String> verificarSitioVirtual(String url) throws IOException {
-        File archivo = new File ("C:\\Users\\jamar\\IdeaProjects\\proxy\\src\\Sockets\\configuracion_hosts.txt");
+
+        URL path = getClass().getResource("configuracion_hosts.txt");
+
+        File archivo = new File (path.getPath());
+
         FileReader fr = new FileReader (archivo);
+
         BufferedReader br = new BufferedReader(fr);
+
         String linea;
         String host;
         List<String> respuesta = new ArrayList<String>();
@@ -232,9 +265,9 @@ public class Server {
             }
 
         }
-        System.out.println("2-"+url);
+
+        System.out.println("sitio_real-"+url);
+
         return respuesta;
     }
-
 }
-
