@@ -76,22 +76,36 @@ public class Server {
 
                             String direccionUrl = request.split("\n")[0].split(" ", 3)[1].strip(); //obtiene direccion url
 
-                            //System.out.println("direccion:" + direccionUrl);
+                            System.out.println("direccion:" + direccionUrl);
+
+                            String host = " ";
+
+                            List<String> sitioVirtual = verificarSitioVirtual(direccionUrl);
+                            if(!sitioVirtual.isEmpty())
+                                if(!direccionUrl.equals(sitioVirtual.get(0))) {
+                                    direccionUrl = sitioVirtual.get(0);
+                                    host = sitioVirtual.get(1);
+                                }
 
                             URL url = new URL(direccionUrl);
 
                             HttpURLConnection con = (HttpURLConnection) url.openConnection();
 
-                            mapearHeadersSolicitud(request, con); //mapea headers para ejecutar la solicitud
+                            mapearHeadersSolicitud(request, con, host); //mapea headers para ejecutar la solicitud
 
                             con.connect(); // ejecuta solicitud
 
-                            String body = leerBody(url);
+                            String body ="";
+
+                            int status = con.getResponseCode();
+
+                            if(status < 400)
+                                body = leerBody(url);
+                            else
+                                input = con.getErrorStream();
 
                             String response = "HTTP/1.1 " + con.getResponseCode() + " " + con.getResponseMessage() + "\r\n";
                             response = response + mapearRespuesta(con) + "\r\n" + body; //costruye respuesta
-
-
 
                             System.out.println( "\n" + response + "\n");
 
@@ -102,8 +116,13 @@ public class Server {
                             }
 
                             con.disconnect();
-                            socket.close();
                         }
+                        else if (request.contains("CONNECT"))
+                        {
+                            output.write(("HTTP/1.1 200 Connection Established").getBytes());
+                            output.flush();
+                      }
+                        socket.close();
                     }
 
                 } catch (IOException e) {
@@ -113,7 +132,7 @@ public class Server {
 
     }
 
-    public void mapearHeadersSolicitud(String request, HttpURLConnection con) throws ProtocolException {
+    public void mapearHeadersSolicitud(String request, HttpURLConnection con, String host) throws ProtocolException {
 
         List<String> lineas = Arrays.asList(request.split("\n"));
 
@@ -125,7 +144,10 @@ public class Server {
             {
                 String[] header = linea.split(":",2);
                 System.out.println(header[0] + header[1]);
-                con.addRequestProperty(header[0].strip(),header[1].strip());
+                if(header[0].strip() == "Host" && host != " ")
+                    con.addRequestProperty(header[0].strip(),host);
+                else
+                    con.addRequestProperty(header[0].strip(),header[1].strip());
             }
             else if (primeraLinea)
             {
@@ -186,6 +208,32 @@ public class Server {
         } while (inputStream.available() > 0);
         System.out.println(resultado.toString());
         return resultado.toString();
+    }
+
+    public List<String> verificarSitioVirtual(String url) throws IOException {
+        File archivo = new File ("C:\\Users\\jamar\\IdeaProjects\\proxy\\src\\Sockets\\configuracion_hosts.txt");
+        FileReader fr = new FileReader (archivo);
+        BufferedReader br = new BufferedReader(fr);
+        String linea;
+        String host;
+        List<String> respuesta = new ArrayList<String>();
+
+        while((linea=br.readLine())!=null){
+
+            String[] lineas = linea.split(",");
+
+            if(url.contains(lineas[0]))
+            {
+                url = url.replace(lineas[0],(lineas[1].replace("-",lineas[2])));
+                respuesta.add(url);
+
+                host = lineas[3];
+                respuesta.add(host);
+            }
+
+        }
+        System.out.println("2-"+url);
+        return respuesta;
     }
 
 }

@@ -1,0 +1,2 @@
+sk36711,www.csun.edu/-/WWW/tutorials,~sk36711,www.csun.edu
+hypertext-1,info.cern.ch/-/WWW,hypertext,info.cern.ch
