@@ -50,7 +50,7 @@ public class Server {
 
                         String direccionUrl = request.split("\n")[0].split(" ", 3)[1].strip(); //obtiene direccion url
 
-                        System.out.println("direccion:" + direccionUrl);
+                        //System.out.println("direccion:" + direccionUrl);
 
                         String host = " ";
 
@@ -85,7 +85,7 @@ public class Server {
 
                         if(status < 400) {
 
-                            System.out.println(status);
+                            //System.out.println(status);
 
                             if(con.getRequestMethod().equals("POST")) {
 
@@ -149,7 +149,7 @@ public class Server {
             {
                 String[] header = linea.split(":",2);
 
-                System.out.println(header[0] + header[1]);
+                //System.out.println(header[0] + header[1]);
 
                 if(header[0].strip() == "Host" && host != " ")
                     con.addRequestProperty(header[0].strip(),host);
@@ -243,6 +243,10 @@ public class Server {
 
         File archivo = new File (path.getPath());
 
+        String sitioVirtual = url;
+
+        boolean sitio = false;
+
         FileReader fr = new FileReader (archivo);
 
         BufferedReader br = new BufferedReader(fr);
@@ -262,11 +266,15 @@ public class Server {
 
                 host = lineas[3];
                 respuesta.add(host);
+                sitio = true;
             }
 
         }
 
-        System.out.println("sitio_real-"+url);
+        if(sitio) {
+            System.out.println("sitio_virtual-" + sitioVirtual);
+            System.out.println("sitio_real-" + url);
+        }
 
         return respuesta;
     }
